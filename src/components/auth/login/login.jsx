@@ -70,10 +70,13 @@ const Login = ({ setAlert, setLoading }) => {
         }
     };
 
-    const handleClockIn = async (employeeId, locationId) => {
+    const handleClockIn = async (employeeId, locationId, companyId) => {
         let params = `employeeId=${employeeId}`;
         if (locationId) {
             params += `&locationId=${locationId}`;
+        }
+        if (companyId) {
+            params += `&companyId=${companyId}`;
         }
         try {
             const response = await addUserTimeIn(params);
@@ -105,6 +108,8 @@ const Login = ({ setAlert, setLoading }) => {
     const submit = async (data) => {
         const response = await login(data)
         let locationId = null;
+        let companyId = response?.data?.result?.data?.companyId;
+
         if (response.data.status === 200) {
             if (response?.data?.result?.data?.checkGeofence === 1 && response?.data?.result?.data?.roleName !== 'Admin' && response?.data?.result?.data?.roleName !== 'Owner') {
                 if (response.data.result?.data?.companyLocation) {
@@ -144,12 +149,12 @@ const Login = ({ setAlert, setLoading }) => {
                             });
                             return
                         } else {
-                            handleClockIn(response?.data.result?.data?.employeeId, locationId)
+                            handleClockIn(response?.data.result?.data?.employeeId, locationId, companyId)
                         }
                     }
                 }
             } else {
-                handleClockIn(response?.data.result?.data?.employeeId, locationId)
+                handleClockIn(response?.data.result?.data?.employeeId, locationId, companyId)
             }
         } else {
             setAlert({ open: true, message: response.data.message, type: "error" });

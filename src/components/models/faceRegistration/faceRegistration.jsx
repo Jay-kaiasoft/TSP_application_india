@@ -6,6 +6,8 @@ import { setAlert } from '../../../redux/commonReducers/commonReducers';
 import CustomIcons from '../../common/icons/CustomIcons';
 import { faceRecognitionAPIBaseURL, faceRecognitionModelURL } from '../../../config/apiConfig/apiConfig';
 import { isNative, checkCameraPermission } from '../../../utils/platform';
+import { FaceDetection } from '@mediapipe/face_detection';
+import { Camera } from '@mediapipe/camera_utils';
 
 const API_BASE_URL = faceRecognitionAPIBaseURL;
 const modelsPath = faceRecognitionModelURL;
@@ -28,6 +30,7 @@ function FaceRegistration({ setAlert, setLoginInfo }) {
     const [modelsLoaded, setModelsLoaded] = useState(false);
     const [isPhotoAlreadyCaptured, setIsPhotoAlreadyCaptured] = useState(false); // Manages visibility
     const [registerMessage, setRegisterMessage] = useState({ text: '', type: '' });
+    const [detectionReady, setDetectionReady] = useState(false);
 
     const dataURLtoBlob = (dataurl) => {
         const arr = dataurl.split(',');
@@ -196,90 +199,217 @@ function FaceRegistration({ setAlert, setLoginInfo }) {
         }
     };
 
-    const startWebcam = async () => {
-        console.log('startWebcam: function called.');
-        try {
-            if (isNative()) {
-                console.log('startWebcam: Native platform detected. Checking permissions...');
-                await checkCameraPermission(); // request explicitly in native
-                console.log('startWebcam: Camera permission granted.');
-            }
+    // const startWebcam = async () => {
+    //     console.log('startWebcam: function called.');
+    //     try {
+    //         if (isNative()) {
+    //             console.log('startWebcam: Native platform detected. Checking permissions...');
+    //             await checkCameraPermission(); // request explicitly in native
+    //             console.log('startWebcam: Camera permission granted.');
+    //         }
 
-            stopWebcam();
-            clearMessage(setRegisterMessage);
-            setIsPhotoAlreadyCaptured(false);
-            countdownActiveRef.current = false;
+    //         stopWebcam();
+    //         clearMessage(setRegisterMessage);
+    //         setIsPhotoAlreadyCaptured(false);
+    //         countdownActiveRef.current = false;
 
-            if (webcamDisplayRef.current) webcamDisplayRef.current.classList.remove('hidden');
-            if (capturedDisplayRef.current) capturedDisplayRef.current.classList.add('hidden');
-            if (webcamVideoRef.current) webcamVideoRef.current.classList.remove('hidden');
-            if (detectionCanvasRef.current) detectionCanvasRef.current.classList.remove('hidden');
-            if (faceFrameRef.current) faceFrameRef.current.classList.remove('hidden');
+    //         if (webcamDisplayRef.current) webcamDisplayRef.current.classList.remove('hidden');
+    //         if (capturedDisplayRef.current) capturedDisplayRef.current.classList.add('hidden');
+    //         if (webcamVideoRef.current) webcamVideoRef.current.classList.remove('hidden');
+    //         if (detectionCanvasRef.current) detectionCanvasRef.current.classList.remove('hidden');
+    //         if (faceFrameRef.current) faceFrameRef.current.classList.remove('hidden');
 
-            // Clean up previous stream and intervals
-            if (currentStream) {
-                currentStream.getTracks().forEach(track => track.stop());
-                setCurrentStream(null);
-            }
-            if (faceDetectionIntervalRef.current) {
-                clearInterval(faceDetectionIntervalRef.current);
-                faceDetectionIntervalRef.current = null;
-            }
-            if (countdownIntervalRef.current) {
-                clearInterval(countdownIntervalRef.current);
-                countdownIntervalRef.current = null;
-            }
+    //         // Clean up previous stream and intervals
+    //         if (currentStream) {
+    //             currentStream.getTracks().forEach(track => track.stop());
+    //             setCurrentStream(null);
+    //         }
+    //         if (faceDetectionIntervalRef.current) {
+    //             clearInterval(faceDetectionIntervalRef.current);
+    //             faceDetectionIntervalRef.current = null;
+    //         }
+    //         if (countdownIntervalRef.current) {
+    //             clearInterval(countdownIntervalRef.current);
+    //             countdownIntervalRef.current = null;
+    //         }
 
-            console.log('startWebcam: Attempting to get stream from getUserMedia...');
-            try {
-                // Simplified constraints for broader compatibility
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        width: { ideal: 320 },
-                        height: { ideal: 240 },
-                        // width: { ideal: 640 },  // Lower res
-                        // height: { ideal: 480 },
-                        frameRate: { max: 30 },
-                        // width: { ideal: 1280 },
-                        // height: { ideal: 720 },
-                        facingMode: 'user'
+    //         console.log('startWebcam: Attempting to get stream from getUserMedia...');
+    //         try {
+    //             // Simplified constraints for broader compatibility
+    //             const stream = await navigator.mediaDevices.getUserMedia({
+    //                 video: {
+    //                     width: { ideal: 320 },
+    //                     height: { ideal: 240 },
+    //                     // width: { ideal: 640 },  // Lower res
+    //                     // height: { ideal: 480 },
+    //                     frameRate: { max: 30 },
+    //                     // width: { ideal: 1280 },
+    //                     // height: { ideal: 720 },
+    //                     facingMode: 'user'
+    //                 }
+    //             });
+
+    //             console.log('startWebcam: Stream acquired successfully!');
+    //             setCurrentStream(stream);
+
+    //             if (webcamVideoRef.current) {
+    //                 console.log('startWebcam: Setting srcObject to video element.');
+    //                 webcamVideoRef.current.srcObject = stream;
+
+    //                 // Directly handle video play without waiting for onloadedmetadata
+    //                 // This can sometimes be more reliable
+    //                 await handlePlayVideo(webcamVideoRef.current);
+    //                 console.log('startWebcam: Video played successfully.');
+
+    //                 const displaySize = {
+    //                     width: webcamVideoRef.current.offsetWidth,
+    //                     height: webcamVideoRef.current.offsetHeight
+    //                 };
+    //                 faceapi.matchDimensions(detectionCanvasRef.current, displaySize);
+
+    //                 showMessage(setRegisterMessage, 'Webcam started. Please position your face within the frame.', 'info');
+    //             }
+    //         } catch (err) {
+    //             console.error('startWebcam: Error accessing webcam with getUserMedia:', err);
+    //             showMessage(setRegisterMessage, 'Could not start webcam. Please check permissions.', 'error');
+    //         }
+    //     } catch (error) {
+    //         console.error('startWebcam: Top-level error:', error);
+    //         showMessage(setRegisterMessage, `Camera error: ${error.message}`, 'error');
+    //     }
+    // };
+
+    const onResults = (results) => {
+        if (!results.detections || results.detections.length === 0) {
+            faceAlignedRef.current = false;
+            if (faceFrameRef.current) {
+                faceFrameRef.current.style.borderColor = "#ef4444";
+            }
+            showMessage(setRegisterMessage, 'No face detected.', 'info');
+            return;
+        }
+
+        const detection = results.detections[0];
+        const box = detection.boundingBox;
+
+        const frameRect = faceFrameRef.current.getBoundingClientRect();
+        const videoRect = webcamVideoRef.current.getBoundingClientRect();
+
+        const faceBox = {
+            x: box.xCenter - box.width / 2,
+            y: box.yCenter - box.height / 2,
+            width: box.width,
+            height: box.height,
+        };
+
+        const faceLeft = faceBox.x * videoRect.width;
+        const faceTop = faceBox.y * videoRect.height;
+        const faceWidth = faceBox.width * videoRect.width;
+        const faceHeight = faceBox.height * videoRect.height;
+
+        const frameLeft = frameRect.left - videoRect.left;
+        const frameTop = frameRect.top - videoRect.top;
+        const frameRight = frameLeft + frameRect.width;
+        const frameBottom = frameTop + frameRect.height;
+
+        const isWithinFrame =
+            faceLeft > frameLeft + 10 &&
+            faceTop > frameTop + 10 &&
+            faceLeft + faceWidth < frameRight - 10 &&
+            faceTop + faceHeight < frameBottom - 10;
+
+        if (isWithinFrame) {
+            faceAlignedRef.current = true;
+            faceFrameRef.current.style.borderColor = "#22c55e";
+
+            if (!isPhotoAlreadyCaptured && !countdownActiveRef.current) {
+                countdownActiveRef.current = true;
+                let countdown = 2;
+                countdownIntervalRef.current = setInterval(() => {
+                    countdown--;
+                    if (countdown <= 0) {
+                        clearInterval(countdownIntervalRef.current);
+                        countdownIntervalRef.current = null;
+                        countdownActiveRef.current = false;
+                        capturePhoto();
                     }
-                });
-
-                console.log('startWebcam: Stream acquired successfully!');
-                setCurrentStream(stream);
-
-                if (webcamVideoRef.current) {
-                    console.log('startWebcam: Setting srcObject to video element.');
-                    webcamVideoRef.current.srcObject = stream;
-
-                    // Directly handle video play without waiting for onloadedmetadata
-                    // This can sometimes be more reliable
-                    await handlePlayVideo(webcamVideoRef.current);
-                    console.log('startWebcam: Video played successfully.');
-
-                    const displaySize = {
-                        width: webcamVideoRef.current.offsetWidth,
-                        height: webcamVideoRef.current.offsetHeight
-                    };
-                    faceapi.matchDimensions(detectionCanvasRef.current, displaySize);
-
-                    showMessage(setRegisterMessage, 'Webcam started. Please position your face within the frame.', 'info');
-                }
-            } catch (err) {
-                console.error('startWebcam: Error accessing webcam with getUserMedia:', err);
-                showMessage(setRegisterMessage, 'Could not start webcam. Please check permissions.', 'error');
+                }, 1000);
             }
-        } catch (error) {
-            console.error('startWebcam: Top-level error:', error);
-            showMessage(setRegisterMessage, `Camera error: ${error.message}`, 'error');
+        } else {
+            faceAlignedRef.current = false;
+            faceFrameRef.current.style.borderColor = "#ef4444";
+            showMessage(setRegisterMessage, 'Face not aligned in frame.', 'warning');
         }
     };
 
+    const startWebcam = async () => {
+        clearMessage(setRegisterMessage);
+        setIsPhotoAlreadyCaptured(false);
+
+        if (webcamDisplayRef.current) webcamDisplayRef.current.classList.remove('hidden');
+        if (capturedDisplayRef.current) capturedDisplayRef.current.classList.add('hidden');
+
+        if (isNative()) {
+            await checkCameraPermission();
+        }
+
+        const videoElement = webcamVideoRef.current;
+
+        const faceDetection = new FaceDetection({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`,
+        });
+
+        faceDetection.setOptions({
+            model: 'short', // faster and smaller
+            minDetectionConfidence: 0.6,
+        });
+
+        faceDetection.onResults(onResults);
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                if (!isPhotoAlreadyCaptured) {
+                    await faceDetection.send({ image: videoElement });
+                }
+            },
+            width: 320,
+            height: 240,
+        });
+
+        camera.start();
+        setDetectionReady(true);
+    };
+
+
+    // const stopWebcam = () => {
+    //     if (currentStream) {
+    //         currentStream.getTracks().forEach(track => track.stop());
+    //         setCurrentStream(null);
+    //     }
+
+    //     if (faceDetectionIntervalRef.current) {
+    //         clearInterval(faceDetectionIntervalRef.current);
+    //         faceDetectionIntervalRef.current = null;
+    //     }
+
+    //     if (countdownIntervalRef.current) {
+    //         clearInterval(countdownIntervalRef.current);
+    //         countdownIntervalRef.current = null;
+    //     }
+
+    //     countdownActiveRef.current = false;
+    //     faceAlignedRef.current = false;
+
+    //     // Optional: Clear UI state if needed
+    //     clearMessage(setRegisterMessage);
+    //     clearMessage(setRegisterMessage);
+    //     setIsPhotoAlreadyCaptured(false);
+    // };
+
     const stopWebcam = () => {
-        if (currentStream) {
-            currentStream.getTracks().forEach(track => track.stop());
-            setCurrentStream(null);
+        if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
         }
 
         if (faceDetectionIntervalRef.current) {
@@ -287,27 +417,21 @@ function FaceRegistration({ setAlert, setLoginInfo }) {
             faceDetectionIntervalRef.current = null;
         }
 
-        if (countdownIntervalRef.current) {
-            clearInterval(countdownIntervalRef.current);
-            countdownIntervalRef.current = null;
-        }
-
         countdownActiveRef.current = false;
         faceAlignedRef.current = false;
 
-        // Optional: Clear UI state if needed
-        clearMessage(setRegisterMessage);
         clearMessage(setRegisterMessage);
         setIsPhotoAlreadyCaptured(false);
     };
 
+
     const capturePhoto = () => {
 
-        if (!currentStream) {
-            console.log('Capture failed: No current stream');
-            showMessage(setRegisterMessage, 'Webcam not active.', 'error');
+        if (!webcamVideoRef.current || webcamVideoRef.current.readyState < 2) {
+            showMessage(setRegisterMessage, 'Webcam not ready yet.', 'error');
             return;
         }
+
 
         if (!faceAlignedRef.current) {
             console.log('Capture failed: Face not aligned at capture moment');
@@ -370,7 +494,7 @@ function FaceRegistration({ setAlert, setLoginInfo }) {
                 console.log('capturePhoto: Stopped countdown interval.');
             }
             countdownActiveRef.current = false;
-            console.log("Face captured successfully! You can now register.");
+            console.log("Face captured successfully! You can now register.");            
             showMessage(setRegisterMessage, 'Face captured successfully! You can now register.', 'success');
             registerUser(dataURL)
         } catch (err) {
