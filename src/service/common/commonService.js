@@ -1,294 +1,77 @@
-import { fileUploadURL } from "../../config/apiConfig/apiConfig"
-import axiosInterceptor from "../axiosInterceptor/axiosInterceptor"
+import { TextToSpeech } from '@capacitor-community/text-to-speech';
 
-export const indianOrganizationType = [
-    {
-        id: 1,
-        title: "Sole Proprietorship"
-    },
-    {
-        id: 2,
-        title: "Partnership"
-    },
-    {
-        id: 3,
-        title: "Limited Liability Partnership"
-    },
-    {
-        id: 4,
-        title: "Private Limited Companies"
-    },
-    {
-        id: 5,
-        title: "Public Limited Companies"
-    },
-    {
-        id: 6,
-        title: "One-Person Companies"
-    },
-    {
-        id: 7,
-        title: "Section 8 Company"
-    },
-    {
-        id: 8,
-        title: "Joint-Venture Company"
-    },
-    {
-        id: 9,
-        title: "Non-Government Organization (NGO)"
-    },
-    { id: 10, title: "Co-operative Society" },
-    { id: 11, title: "Trust" },
-    { id: 12, title: "Producer Company" },
-    { id: 13, title: "Public Sector Undertaking (PSU)" },
-    { id: 14, title: "Hindu Undivided Family (HUF)" },
-    { id: 15, title: "Non-Banking Financial Company (NBFC)" },
-
-];
-
-export const oganizationType = [
-    { id: 1, title: 'Sole Proprietorship' },
-    { id: 2, title: 'Partnership' },
-    { id: 3, title: 'Limited Liability Company (LLC)' },
-    { id: 4, title: 'Professional Limited Liability Company (PLLC)' },
-    { id: 5, title: 'S Corporation' },
-    { id: 6, title: 'C Corporation' },
-    { id: 7, title: 'Nonprofit', },
-    { id: 8, title: 'Government Agency' },
-    { id: 9, title: 'Educational Institution' },
-    { id: 10, title: 'Franchise' },
-];
-
-export const uploadFiles = async (data) => {
+export async function playBeep() {
     try {
-        const response = axiosInterceptor().post(`${fileUploadURL}`, data)
-        return response
-
-    } catch (error) {
-        console.log(error)
+        const audio = new Audio('/audio/public-domain-beep-sound.mp3');
+        console.log("audio", audio)
+        audio.preload = 'auto';
+        audio.currentTime = 0; // restart if already playing
+        await audio.play();
+    } catch (err) {
+        console.warn("Beep playback failed:", err);
     }
 }
 
-export const handleConvertUTCDateToLocalDate = (utcDateString) => {
-    if (!utcDateString) return null;
-
+export const speakMessage = async (message) => {
     try {
-        // Parse the UTC date string
-        const [datePart, timePart] = utcDateString.split(', ');
-        const [month, day, year] = datePart.split('/');
-        const [time, period] = timePart.split(' ');
-        const [hours, minutes, seconds] = time.split(':');
+        const { voices } = await TextToSpeech.getSupportedVoices();
 
-        // Convert to 24-hour format
-        let hours24 = parseInt(hours, 10);
-        if (period === 'PM' && hours24 !== 12) hours24 += 12;
-        if (period === 'AM' && hours24 === 12) hours24 = 0;
+        console.log("Available voices:", voices);
 
-        // Create a Date object in UTC and convert to local time
-        return new Date(Date.UTC(
-            parseInt(year, 10),
-            parseInt(month, 10) - 1,
-            parseInt(day, 10),
-            hours24,
-            parseInt(minutes, 10),
-            parseInt(seconds, 10)
-        ));
-    } catch (error) {
-        console.error("Conversion error:", error);
-        return null;
-    }
-};
-
-export function handleFormateUTCDateToLocalDate(utcDateString) {
-    const date = new Date(utcDateString);
-
-    const month = date.toLocaleString('en-US', { month: 'short' });
-    const day = date.getDate();
-    const weekday = date.toLocaleString('en-US', { weekday: 'short' });
-
-    return `${month} ${day}, ${weekday}`;
-}
-
-export const fetchAllTimeZones = async () => {
-    try {
-        // const response = axiosInterceptor().get(`${timeZoneURL}`)
-        // const timeZones = response?.data?.result;
-
-        const response = await fetch(`https://timeapi.io/api/timezone/availabletimezones`)
-        const timeZones = await response.json();
-        const formattedTimeZones = timeZones?.map((zone, index) => {
-            const now = new Date();
-
-            const formatter = new Intl.DateTimeFormat("en-US", {
-                timeZone: zone,
-                timeZoneName: "longOffset",
-            });
-
-            const parts = formatter.formatToParts(now);
-            let offsetString = parts.find((part) => part.type === "timeZoneName")?.value || "";
-            offsetString = offsetString.replace("GMT", "UTC");
-
-            return { id: index + 1, title: `(${offsetString}) ${zone}`, zone: `${zone}` };
+        // Example: Pick the first female English voice
+        const femaleVoice = voices.find(
+            (v) => v.lang === "en-GB" && v.name.includes("Google UK English Female")
+        );        
+        await TextToSpeech.speak({
+            text: message,
+            lang: femaleVoice.lang,
+            voice: femaleVoice.voiceURI,  // use selected voice
+            rate: 0.8,
+            pitch: 1.0,
+            volume: 1.0
         });
-        return formattedTimeZones;
-        // return response;
-    } catch (error) {
-        console.error("Error fetching time zones:", error);
-        return []; // Return an empty array on failure
+    } catch (err) {
+        console.error("TTS error:", err);
     }
 }
 
-export const getAllCountryList = async () => {
-    try {
-        const response = await fetch(`https://restcountries.com/v3.1/all`, {
-            method: 'GET',
-        })
-        const data = await response.json();
-        const simplifiedData = data?.map((country, index) => ({
-            id: index + 1,
-            title: country.name?.common || '',
-            flag: country.flags?.png || '',
-        }));
-        return simplifiedData;
-    } catch (error) {
-        console.log(error)
-    }
-}
 
-export const getListOfYears = () => {
-    try {
-        const currentYear = new Date().getFullYear();
-        const startYear = 2000;
+// import { Capacitor } from '@capacitor/core';
+// import { NativeAudio } from '@capacitor-community/native-audio';
 
-        const years = Array.from(
-            { length: currentYear - startYear + 1 },
-            (_, index) => startYear + index
-        );
-        return years.map(year => ({ id: year, title: year.toString() }))?.reverse();
-    } catch (error) {
-        console.error("Error fetching years:", error);
-        return [];
-    }
-}
+// // A variable to track whether the audio is ready to play.
+// let isBeepReady = false;
 
-export const getStaticRoles = () => {
-    return [
-        {
-            id: 1,
-            title: 'Owner',
-        },
-        {
-            id: 2,
-            title: 'Admin',
-        },
-        {
-            id: 3,
-            title: 'Manager',
-        },
-    ];
-}
+// // Function to preload the audio on app startup or a similar initial event.
+// export async function setupBeep() {
+//     if (Capacitor.isNativePlatform()) {
+//         try {
+//             // Await the preload promise to ensure the file is loaded.
+//             await NativeAudio.preload({
+//                 assetId: 'beep',
+//                 assetPath: 'http://localhost:3000/audio/public-domain-beep-sound.mp3',
+//                 isUrl: true
+//             });
+//             console.log('Beep audio preloaded successfully.');
+//             isBeepReady = true;
+//         } catch (e) {
+//             console.error('Failed to preload native beep:', e);
+//         }
+//     }
+// }
 
-export const getStaticRolesWithPermissions = () => {
-    return getStaticRoles()?.map((item, index) => {
-        return {
-            roleName: item.title,
-            rolesActions: {
-                "functionalities": [
-                    {
-                        "functionalityId": 1,
-                        "functionalityName": "Company",
-                        "modules": [
-                            {
-                                "moduleId": 3,
-                                "moduleName": "Manage Company",
-                                "moduleAssignedActions": [
-                                    1,
-                                    2,
-                                    3,
-                                    4
-                                ],
-                                "roleAssignedActions": [
-                                    1,
-                                    2,
-                                    3,
-                                    4
-                                ]
-                            },
-                            {
-                                "moduleId": 5,
-                                "moduleName": "Manage Employees",
-                                "moduleAssignedActions": [
-                                    1,
-                                    2,
-                                    3,
-                                    4
-                                ],
-                                "roleAssignedActions": [
-                                    1,
-                                    2,
-                                    3,
-                                    4
-                                ]
-                            },
-                            {
-                                "moduleId": 9,
-                                "moduleName": "Manage Shifts",
-                                "moduleAssignedActions": [
-                                    1,
-                                    2,
-                                    3,
-                                    4
-                                ],
-                                "roleAssignedActions": [
-                                    1,
-                                    2,
-                                    3,
-                                    4
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        "functionalityId": 3,
-                        "functionalityName": "Permission",
-                        "modules": [
-                            {
-                                "moduleId": 2,
-                                "moduleName": "Role",
-                                "moduleAssignedActions": [
-                                    1,
-                                    2,
-                                    3,
-                                    4
-                                ],
-                                "roleAssignedActions": [
-                                    1,
-                                    2,
-                                    3,
-                                    4
-                                ]
-                            },
-                            {
-                                "moduleId": 6,
-                                "moduleName": "Department",
-                                "moduleAssignedActions": [
-                                    1,
-                                    2,
-                                    3,
-                                    4
-                                ],
-                                "roleAssignedActions": [
-                                    1,
-                                    2,
-                                    3,
-                                    4
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            }
-        }
-    })
-}
+// // Function to play the audio, called only when the app needs the sound.
+// export async function playBeep() {
+//     if (Capacitor.isNativePlatform() && isBeepReady) {
+//         try {
+//             await NativeAudio.play({ assetId: 'beep' });
+//         } catch (e) {
+//             console.error('Native beep play error:', e);
+//         }
+//     } else {
+//         // Fallback to web Audio
+//         const audio = new Audio('/audio/beep.mp3');
+//         audio.currentTime = 0;
+//         audio.play().catch(() => { });
+//     }
+// }

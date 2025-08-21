@@ -8,6 +8,7 @@ import { radarPKAPIKey } from '../../../config/apiConfig/apiConfig';
 import { getAccurateLocation } from '../../../service/common/radarService';
 import FaceRegistration from '../../models/faceRegistration/faceRegistration';
 import { addUserTimeIn } from '../../../service/userInOut/userInOut';
+import { speakMessage } from '../../../service/common/commonService';
 
 const Login = ({ setAlert, setLoading }) => {
     const [loginInfo, setLoginInfo] = useState(null);
@@ -86,12 +87,14 @@ const Login = ({ setAlert, setLoading }) => {
                     message: response.data.message || "Clock-in successful",
                     type: "success"
                 });
+                await speakMessage("Thank you, You are in.");
             } else if (response?.data?.status === 200) {
                 setAlert({
                     open: true,
                     message: response.data.message || "Clock-out successful",
                     type: "success"
                 });
+                await speakMessage("Thank you, You are out.");
             }
             else {
                 setAlert({
